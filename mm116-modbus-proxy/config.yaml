@@ -1,0 +1,28 @@
+name: "MM-116 Modbus Proxy"
+version: "1.0.0"
+slug: "mm116-modbus-proxy"
+description: "Modbus TCP multiplexer pro MM-116 — umožňuje připojení více klientů k zařízení s jedním spojením"
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+homeassistant_api: false
+host_network: true
+options:
+  mm116_host: "192.168.2.15"
+  mm116_port: 10001
+  mm116_slave_id: 1
+  server_port: 5020
+  poll_fast_interval: 2
+  poll_config_interval: 30
+  log_level: "INFO"
+schema:
+  mm116_host: str
+  mm116_port: port
+  mm116_slave_id: "int(1,247)"
+  server_port: port
+  poll_fast_interval: "int(1,300)"
+  poll_config_interval: "int(5,600)"
+  log_level: "list(DEBUG|INFO|WARNING|ERROR)"
