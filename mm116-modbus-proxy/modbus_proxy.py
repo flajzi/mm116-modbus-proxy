@@ -16,10 +16,10 @@ from dataclasses import dataclass
 from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.datastore import (
     ModbusServerContext,
-    ModbusDeviceContext,
+    ModbusSlaveContext,
     ModbusSparseDataBlock,
 )
-from pymodbus.framer import FramerType
+from pymodbus.framer import Framer
 from pymodbus.server import StartAsyncTcpServer
 
 log = logging.getLogger(__name__)
@@ -75,13 +75,9 @@ def _is_writable(address: int, count: int) -> bool:
 class WriteThruDataBlock(ModbusSparseDataBlock):
     """Holding register data block that forwards writes to the real MM-116."""
 
-    # ModbusDeviceContext adds +1 to addresses before calling datablock methods.
-    # We store data at addr+1 so that Modbus address 0x00 maps to key 0x01.
-    OFFSET = 1
-
     def __init__(self, upstream_client: AsyncModbusTcpClient, slave_id: int):
-        # Pre-populate address space with zeros (shifted by OFFSET)
-        values = {addr + self.OFFSET: 0 for addr in range(0x00, 0xB0)}
+        # Pre-populate address space 0x00-0xAF with zeros
+        values = {addr: 0 for addr in range(0x00, 0xB0)}
         super().__init__(values)
         self._upstream = upstream_client
         self._slave_id = slave_id
@@ -89,17 +85,12 @@ class WriteThruDataBlock(ModbusSparseDataBlock):
 
     def update_from_device(self, modbus_address: int, registers: list[int]):
         """Update cache from polled device data (no write-through)."""
-        super().setValues(modbus_address + self.OFFSET, registers)
+        super().setValues(modbus_address, registers)
 
     def setValues(self, address, values):
-        """Called by pymodbus server when a downstream client writes registers.
-
-        Note: 'address' here already has the +1 offset applied by ModbusDeviceContext.
-        We need to subtract the offset to get the real Modbus address for write-through.
-        """
-        real_address = address - self.OFFSET
-        if not _is_writable(real_address, len(values)):
-            log.warning("Write rejected: 0x%02X (%d regs) is read-only", real_address, len(values))
+        """Called by pymodbus server when a downstream client writes registers."""
+        if not _is_writable(address, len(values)):
+            log.warning("Write rejected: 0x%02X (%d regs) is read-only", address, len(values))
             return
 
         # Update local cache immediately (optimistic)
@@ -107,13 +98,13 @@ class WriteThruDataBlock(ModbusSparseDataBlock):
 
         # Schedule write-through to real device
         if self._loop and self._loop.is_running():
-            self._loop.create_task(self._write_through(real_address, values))
+            self._loop.create_task(self._write_through(address, values))
 
     async def _write_through(self, address: int, values: list[int]):
         """Forward the write to the real MM-116 device."""
         try:
             result = await self._upstream.write_registers(
-                address, values, device_id=self._slave_id
+                address, values, slave=self._slave_id
             )
             if result.isError():
                 log.error("Write-through failed at 0x%02X: %s", address, result)
@@ -147,7 +138,7 @@ class MM116ModbusProxy:
         self.client = AsyncModbusTcpClient(
             host=self.mm116_host,
             port=self.mm116_port,
-            framer=FramerType.RTU,
+            framer=Framer.RTU,
             timeout=5,
             retries=3,
             reconnect_delay=2,
@@ -185,7 +176,7 @@ class MM116ModbusProxy:
         """Read a contiguous block of holding registers and update cache."""
         try:
             result = await self.client.read_holding_registers(
-                address=start, count=count, device_id=self.slave_id
+                address=start, count=count, slave=self.slave_id
             )
             if result.isError():
                 log.error("Poll %s failed: %s", label, result)
@@ -228,12 +219,13 @@ class MM116ModbusProxy:
         await self._poll_registers(0x80, 48, "0x80-0xAF (initial)")
 
         # 3. Build Modbus server context
-        slave_ctx = ModbusDeviceContext(
+        slave_ctx = ModbusSlaveContext(
             hr=self.datablock,  # holding registers (FC 3/6/16)
             ir=self.datablock,  # input registers (FC 4) — same data
+            zero_mode=True,
         )
         server_ctx = ModbusServerContext(
-            devices={self.slave_id: slave_ctx},
+            slaves={self.slave_id: slave_ctx},
             single=False,
         )
 
