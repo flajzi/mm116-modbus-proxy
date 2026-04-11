@@ -1,15 +1,16 @@
-#!/usr/bin/with-bashio
-# shellcheck shell=bash
+#!/bin/sh
 
-bashio::log.info "Starting MM-116 Modbus Proxy..."
+echo "Starting MM-116 Modbus Proxy..."
 
-MM116_HOST=$(bashio::config 'mm116_host')
-MM116_PORT=$(bashio::config 'mm116_port')
-MM116_SLAVE_ID=$(bashio::config 'mm116_slave_id')
-SERVER_PORT=$(bashio::config 'server_port')
-POLL_FAST=$(bashio::config 'poll_fast_interval')
-POLL_CONFIG=$(bashio::config 'poll_config_interval')
-LOG_LEVEL=$(bashio::config 'log_level')
+CONFIG=/data/options.json
+
+MM116_HOST=$(jq -r '.mm116_host' "$CONFIG")
+MM116_PORT=$(jq -r '.mm116_port' "$CONFIG")
+MM116_SLAVE_ID=$(jq -r '.mm116_slave_id' "$CONFIG")
+SERVER_PORT=$(jq -r '.server_port' "$CONFIG")
+POLL_FAST=$(jq -r '.poll_fast_interval' "$CONFIG")
+POLL_CONFIG=$(jq -r '.poll_config_interval' "$CONFIG")
+LOG_LEVEL=$(jq -r '.log_level' "$CONFIG")
 
 exec python3 /modbus_proxy.py \
   --mm116-host "$MM116_HOST" \
