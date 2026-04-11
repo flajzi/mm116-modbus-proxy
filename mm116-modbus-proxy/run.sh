@@ -1,4 +1,5 @@
 #!/usr/bin/with-bashio
+# shellcheck shell=bash
 
 bashio::log.info "Starting MM-116 Modbus Proxy..."
 
