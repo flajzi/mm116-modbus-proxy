@@ -1,5 +1,5 @@
 name: "MM-116 Modbus Proxy"
-version: "1.0.3"
+version: "1.0.4"
 init: false
 slug: "mm116-modbus-proxy"
 description: "Modbus TCP multiplexer pro MM-116 — umožňuje připojení více klientů k zařízení s jedním spojením"
@@ -16,8 +16,8 @@ options:
   mm116_port: 10001
   mm116_slave_id: 1
   server_port: 5020
-  poll_fast_interval: 2
-  poll_config_interval: 30
+  poll_fast_interval: 1
+  poll_config_interval: 10
   log_level: "INFO"
 schema:
   mm116_host: str
