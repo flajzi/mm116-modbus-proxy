@@ -1,5 +1,5 @@
 name: "MM-116 Modbus Proxy"
-version: "1.0.0"
+version: "1.0.1"
 slug: "mm116-modbus-proxy"
 description: "Modbus TCP multiplexer pro MM-116 — umožňuje připojení více klientů k zařízení s jedním spojením"
 arch:
